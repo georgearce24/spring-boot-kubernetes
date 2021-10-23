@@ -55,33 +55,37 @@ pipeline {
                
            
         
-           stage('DAST'){
-            steps{
-                figlet 'Owasp Zap DAST'
-        		
-        		script{
-        		   env.DOCKER = tool "Docker"
-        		   env.DOCKER_EXEC = "${DOCKER}/bin/docker"
-        		   env.TARGET = 'http://zero.webappsecurity.com'
-        	
-        		    sh '${DOCKER_EXEC} rm -f zap2'
-        		    sh "${DOCKER_EXEC} pull owasp/zap2docker-stable"
-                    //sh '${DOCKER_EXEC} run --add-host="localhost:192.168.1.110" --rm -e LC_ALL=C.UTF-8 -e LANG=C.UTF-8 --name zap2 -u zap -p 8081:8081 -d owasp/zap2docker-stable zap.sh -daemon -port 8081 -host 0.0.0.0 -config api.disablekey=true'
-                    sh '${DOCKER_EXEC} run sudo docker run -v $(pwd):/zap/wrk/:rw -t owasp/zap2docker-stable zap-full-scan.py \-t http://zero.webappsecurity.com -g gen.conf -r zero-webappsecurity-com2021.html
-//sh '${DOCKER_EXEC} run --user $(id -w):$(id -q) --add-host="localhost:192.168.1.110" -v /root/jenkins/tools:/zap/wrk/:rw --rm -i owasp/zap2docker-stable zap-baseline.py -t "http://zero.webappsecurity.com" -I -r zap_baseline_report.html -l PASS'	
-        		   
-        		   publishHTML([
-        				    allowMissing: false,
-        				    alwaysLinkToLastBuild: false,
-        				    keepAll: false,
-        				    reportDir: '/var/jenkins_home/tools/',
-        				    reportFiles: 'zap_baseline_report.html',
-        				    reportName: 'HTML Report',
-        				    reportTitles: ''])
+          stage('DAST') {
+            steps {
+                script {
+                    try {
+                        echo "Inicio de Scanneo Dinamico"
+                        sh "docker exec zap zap-cli --verbose quick-scan http://zero.webappsecurity.com:8090 -l Medium" 
+                        //sh "docker exec zap zap-cli --verbose alerts --alert-level Medium -f json | jq length"
+                        currentBuild.result = 'SUCCESS' 
+                    }
+                    catch (Exception e) {
+                            //echo e.getMessage() 
+                            //currentBuild.result = 'FAILURE'
+                            println ("Revisar Reporte ZAP. Se encontraron Vulnerabilidades.")
+
+                        }
+                    }  
+                    echo currentBuild.result 
+                    echo "Generacion de Reporte"
+                    sh "docker exec zap zap-cli --verbose report -o /zap/reports/owasp-quick-scan-report.html --output-format html"
+                    publishHTML target: [
+                        allowMissing: false,
+                        alwaysLinkToLastBuild: false,
+                        keepAll: true,
+                        reportDir: '/var/jenkins_home',
+                        reportFiles: 'owasp-quick-scan-report.html',
+                        reportName: 'Analisis DAST'
+                      ]          
+            }
+        }
         		
             
         
                  
-           }
-            }
-           }
+           
